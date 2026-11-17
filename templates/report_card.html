@@ -1,0 +1,309 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Report Card</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: Arial, sans-serif;
+            background: #f3f6fb;
+            color: #263449;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            color: #173b70;
+        }
+
+        .subtitle {
+            color: #64748b;
+        }
+
+        button {
+            border: none;
+            border-radius: 7px;
+            padding: 11px 16px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+        }
+
+        .card {
+            background: white;
+            padding: 24px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px #1e293b0d;
+        }
+
+        .details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+        }
+
+        .label {
+            color: #64748b;
+            font-size: 13px;
+            margin-bottom: 7px;
+        }
+
+        .value {
+            font-size: 18px;
+            font-weight: bold;
+            overflow-wrap: anywhere;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat {
+            background: white;
+            padding: 22px;
+            border-radius: 12px;
+            border-left: 4px solid #2563eb;
+        }
+
+        .stat h2 {
+            margin: 8px 0 0;
+            color: #173b70;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 500px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 13px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #f1f5f9;
+        }
+
+        .message {
+            padding: 20px;
+            color: #64748b;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            .card, .stat {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <div class="header">
+        <div>
+            <h1>Student Report Card</h1>
+            <div class="subtitle">Smart Student Management System</div>
+        </div>
+
+        <div class="no-print">
+            <button onclick="window.location.href='/'">← Dashboard</button>
+            <button onclick="window.print()">Print Report</button>
+        </div>
+    </div>
+
+    <div id="message" class="card message">Loading report card...</div>
+
+    <div id="report" hidden>
+        <div class="card">
+            <h2>Student Information</h2>
+            <div class="details">
+                <div>
+                    <div class="label">Roll Number</div>
+                    <div class="value" id="rollNumber">-</div>
+                </div>
+                <div>
+                    <div class="label">Full Name</div>
+                    <div class="value" id="fullName">-</div>
+                </div>
+                <div>
+                    <div class="label">Email</div>
+                    <div class="value" id="email">-</div>
+                </div>
+                <div>
+                    <div class="label">Course</div>
+                    <div class="value" id="course">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="label">Overall Marks</div>
+                <h2 id="marks">0%</h2>
+            </div>
+
+            <div class="stat">
+                <div class="label">Attendance</div>
+                <h2 id="attendance">0%</h2>
+            </div>
+
+            <div class="stat">
+                <div class="label">Assessments Completed</div>
+                <h2 id="assessmentCount">0</h2>
+            </div>
+
+            <div class="stat">
+                <div class="label">Assessment Average</div>
+                <h2 id="average">N/A</h2>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Assessment History</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Assessment Name</th>
+                        <th>Marks</th>
+                        <th>Date</th>
+                    </tr>
+                    </thead>
+
+                    <tbody id="assessmentTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const studentId = {{ student_id | tojson }};
+
+    async function loadReportCard() {
+        const message = document.getElementById("message");
+
+        try {
+            const response = await fetch(`/students/${studentId}/report`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || data.error || "Report load nahi hua.");
+            }
+
+            const student = data.student;
+
+            if (!student) {
+                throw new Error("Student record nahi mila.");
+            }
+
+            document.getElementById("rollNumber").textContent =
+                student.roll_number ?? "-";
+
+            document.getElementById("fullName").textContent =
+                student.full_name ?? "-";
+
+            document.getElementById("email").textContent =
+                student.email ?? "-";
+
+            document.getElementById("course").textContent =
+                student.course ?? "-";
+
+            document.getElementById("marks").textContent =
+                (student.marks ?? 0) + "%";
+
+            document.getElementById("attendance").textContent =
+                (student.attendance ?? 0) + "%";
+
+            document.getElementById("assessmentCount").textContent =
+                data.assessment_count ?? 0;
+
+            document.getElementById("average").textContent =
+                data.assessment_average == null
+                    ? "N/A"
+                    : Number(data.assessment_average).toFixed(2) + "%";
+
+            const table = document.getElementById("assessmentTable");
+            const assessments = data.assessments || [];
+
+            if (assessments.length === 0) {
+                table.innerHTML = `
+                    <tr>
+                        <td colspan="3">Abhi koi assessment record nahi hai.</td>
+                    </tr>`;
+            } else {
+                table.innerHTML = assessments.map(item => `
+                    <tr>
+                        <td>${escapeHTML(item.assessment_name ?? "-")}</td>
+                        <td>${escapeHTML(String(item.marks ?? 0))}</td>
+                        <td>${escapeHTML(String(item.assessment_date ?? "-").slice(0, 10))}</td>
+                    </tr>
+                `).join("");
+            }
+
+            message.hidden = true;
+            document.getElementById("report").hidden = false;
+
+        } catch (error) {
+            message.textContent = error.message;
+        }
+    }
+
+    function escapeHTML(value) {
+        return value.replace(/[&<>"']/g, char => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;"
+        })[char]);
+    }
+
+    loadReportCard();
+</script>
+</body>
+</html>

@@ -1,0 +1,827 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+<body>
+    
+<div class="dashboard-layout">
+    <aside class="sidebar">
+        <h2 class="sidebar-logo">StudentHub</h2>
+
+        <p class="sidebar-label">MAIN MENU</p>
+        <a href="#dashboard" class="sidebar-link active">▦ Dashboard</a>
+        <a href="#addStudent" class="sidebar-link">＋ Add Student</a>
+        <a href="#studentRecords" class="sidebar-link">♙ Student Records</a>
+        <a href="#charts" class="sidebar-link">◉ Analytics</a>
+        <a href="#aiPrediction" class="sidebar-link">🤖 AI Prediction</a>
+
+
+        <div class="sidebar-footer">
+            <p>Smart Student Management</p>
+            <small>Admin Panel v1.0</small>
+        </div>
+    </aside>
+
+    <main class="dashboard-main">
+
+
+    <h1 id="dashboard">Smart Student Management System</h1>
+    
+    <p>Manage all your students in one place.</p>
+    
+<!-- Dashboard Analytics -->
+<section class="analytics-section">
+    <h2>Dashboard Overview</h2>
+
+    <div class="analytics-grid">
+        <div class="analytics-card">
+            <p>Total Students</p>
+            <h2 id="totalStudents">--</h2>
+        </div>
+
+        <div class="analytics-card">
+            <p>Average Marks</p>
+            <h2 id="averageMarks">--</h2>
+        </div>
+
+        <div class="analytics-card">
+            <p>Average Attendance</p>
+            <h2 id="averageAttendance">--</h2>
+        </div>
+
+        <div class="analytics-card">
+            <p>Low Attendance (Below 75%)</p>
+            <h2 id="lowAttendance">--</h2>
+        </div>
+    </div>
+</section>
+
+<section id="ai-insights" class="content-section">
+    <h2>AI Student Insights</h2>
+    <p>
+        Predict student performance and identify students
+        who may need academic support.
+    </p>
+
+    <div class="card">
+        <label for="aiStudentSelect">Select Student</label>
+        <select id="aiStudentSelect">
+            <option value="">Choose a student</option>
+        </select>
+
+        <button onclick="runAIPrediction()">
+            Analyze Performance
+        </button>
+    </div>
+
+    <div id="aiPredictionResult"></div>
+</section>
+
+
+
+   
+    
+<div class="stats-container">
+    <div class="stat-card">
+        <p>Total Students</p>
+        <h2 id="totalStudents">0</h2>
+    </div>
+
+    <div class="stat-card">
+        <p>Average Marks</p>
+        <h2 id="averageMarks">0</h2>
+    </div>
+
+    <div class="stat-card">
+        <p>Average Attendance</p>
+        <h2 id="averageAttendance">0%</h2>
+    </div>
+</div>
+
+<div class="charts-container" id="charts">
+    <div class="chart-card">
+        <h2>Student Performance Overview</h2>
+        <canvas id="performanceChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+        <h2>Course-wise Distribution</h2>
+        <canvas id="courseChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+        <h2>Attendance Overview</h2>
+        <canvas id="attendanceChart"></canvas>
+    </div>
+</div>
+
+ <h2 id="addStudent">Add New Student</h2>
+
+
+
+
+    <form id="studentForm" >
+        <input type="text" id="roll_number" placeholder="Roll Number" required>
+        <input type="text" id="full_name" placeholder="Full Name" required>
+        <input type="email" id="email" placeholder="Email">
+        <input type="text" id="course" placeholder="Course" required>
+        <button type="submit">Add Student</button>
+    </form>
+
+    <h2 id="studentRecords">Student Records</h2>
+    
+    <button onclick="loadStudents()">Refresh Students</button>
+    
+<div class="filter-container">
+    <input
+        type="text"
+        id="searchStudent"
+        placeholder="Search by name or roll number..."
+    >
+
+    <select id="courseFilter">
+        <option value="">All Courses</option>
+    </select>
+</div>
+
+
+    <table border="1" cellpadding="8">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Roll Number</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Course</th>
+                <th>Marks</th>
+                <th>Attendance</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="studentTable"></tbody>
+    </table>
+
+    
+<script>
+    
+function filterStudents() {
+    const searchValue = document.getElementById("searchStudent").value.toLowerCase();
+    const courseValue = document.getElementById("courseFilter").value;
+
+    const rows = document.querySelectorAll("#studentTable tr");
+
+    rows.forEach(row => {
+        const name = row.cells[2].textContent.toLowerCase();
+        const rollNumber = row.cells[1].textContent.toLowerCase();
+        const course = row.cells[4].textContent;
+
+        const matchesSearch =
+            name.includes(searchValue) ||
+            rollNumber.includes(searchValue);
+
+        const matchesCourse =
+            courseValue === "" || course === courseValue;
+
+        row.style.display =
+            matchesSearch && matchesCourse ? "" : "none";
+    });
+}
+document.getElementById("searchStudent")
+    .addEventListener("input", filterStudents);
+
+document.getElementById("courseFilter")
+    .addEventListener("change", filterStudents);
+    
+let performanceChart = null;
+let courseChart = null;
+let attendanceChart = null;
+
+function updateCharts(students) {
+    const performanceCanvas = document.getElementById("performanceChart");
+    const courseCanvas = document.getElementById("courseChart");
+    const attendanceCanvas = document.getElementById("attendanceChart");
+
+    if (performanceChart) performanceChart.destroy();
+    if (courseChart) courseChart.destroy();
+    if (attendanceChart) attendanceChart.destroy();
+
+    performanceChart = new Chart(performanceCanvas, {
+        type: "line",
+        data: {
+            labels: students.map(s => s.full_name),
+            datasets: [{
+                label: "Marks",
+                data: students.map(s => Number(s.marks || 0)),
+                borderColor: "#2563eb",
+                backgroundColor: "rgba(37, 99, 235, 0.12)",
+                fill: true,
+                tension: 0.35
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+
+    const courseCounts = {};
+    students.forEach(s => {
+        courseCounts[s.course] = (courseCounts[s.course] || 0) + 1;
+    });
+
+    courseChart = new Chart(courseCanvas, {
+        type: "doughnut",
+        data: {
+            labels: Object.keys(courseCounts),
+            datasets: [{
+                data: Object.values(courseCounts),
+                backgroundColor: ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    const present = students.filter(s => Number(s.attendance || 0) >= 75).length;
+    const below = students.length - present;
+
+    attendanceChart = new Chart(attendanceCanvas, {
+        type: "pie",
+        data: {
+            labels: ["Attendance 75% or above", "Attendance below 75%"],
+            datasets: [{
+                data: [present, below],
+                backgroundColor: ["#10b981", "#f59e0b"]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+
+
+    async function loadStudents() {
+        try {
+            const response = await fetch("/students");
+            const students = await response.json();
+            updateCharts(students);
+            
+const courses = [...new Set(students.map(s => s.course).filter(Boolean))];
+
+const courseFilter = document.getElementById("courseFilter");
+const selectedCourse = courseFilter.value;
+
+courseFilter.innerHTML = '<option value="">All Courses</option>';
+
+courses.forEach(course => {
+    const option = document.createElement("option");
+    option.value = course;
+    option.textContent = course;
+    courseFilter.appendChild(option);
+});
+
+courseFilter.value = selectedCourse;
+
+            document.getElementById("totalStudents").textContent = students.length;
+
+document.getElementById("averageMarks").textContent =
+    students.length ? (students.reduce((sum, s) => sum + Number(s.marks || 0), 0) / students.length).toFixed(2) : "0";
+
+document.getElementById("averageAttendance").textContent =
+    students.length ? (students.reduce((sum, s) => sum + Number(s.attendance || 0), 0) / students.length).toFixed(2) + "%" : "0%";
+
+            const table = document.getElementById("studentTable");
+
+            table.innerHTML = students.map(student => `
+                <tr>
+                    <td>${student.id}</td>
+                    <td>${student.roll_number}</td>
+                    <td>${student.full_name}</td>
+                    <td>${student.email || ""}</td>
+                    <td>${student.course}</td>
+                    <td>${student.marks}</td>
+                    <td>${student.attendance}%</td>
+                    <td class="action-buttons">
+                        <button onclick="editStudent(${student.id})">Edit</button>
+                        <button onclick="deleteStudent(${student.id})">Delete</button>
+                        <button onclick="toggleStudentActions(${student.id})">
+                            More ⋮
+                            </button>
+                            <div id="actions-${student.id}" class="extra-actions" hidden>
+                                
+<button onclick="window.location.href='/report-card/${student.id}'">
+    Report Card
+</button>
+
+                                <button onclick="editAcademicRecord(${student.id})">Marks & Attendance</button>
+                                <button onclick="addAssessment(${student.id})">Add Assessment</button>
+                                <button onclick="viewAssessments(${student.id})">View History</button>
+                                <button onclick="window.location.href='/attendance'">
+                                    Mark Attendance
+                                    </button>
+                                    </div>
+                                    </td>
+
+
+                </tr>
+            `).join("");
+        } catch (error) {
+            alert("Students load nahi ho paaye.");
+            console.error(error);
+        }
+    }
+
+    document.getElementById("studentForm").addEventListener("submit", async function(event) {
+        event.preventDefault();
+
+        const student = {
+            roll_number: document.getElementById("roll_number").value.trim(),
+            full_name: document.getElementById("full_name").value.trim(),
+            email: document.getElementById("email").value.trim() || null,
+            course: document.getElementById("course").value.trim()
+        };
+
+        try {
+            const response = await fetch("/students", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(student)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                alert(result.error || "Student add nahi hua.");
+                return;
+            }
+
+            alert("Student successfully add ho gaya!");
+            document.getElementById("studentForm").reset();
+            await loadStudents();
+
+        } catch (error) {
+            alert("Server se connection nahi ho paaya.");
+            console.error(error);
+        }
+    });
+
+    loadStudents();
+    
+async function addAssessment(id) {
+    const assessmentName = prompt("Enter assessment name (e.g. Unit Test 1):");
+    if (assessmentName === null || !assessmentName.trim()) return;
+
+    const marksInput = prompt("Enter marks (0-100):");
+    if (marksInput === null || marksInput.trim() === "") return;
+
+    const marks = Number(marksInput);
+
+    if (!Number.isFinite(marks) || marks < 0 || marks > 100) {
+        alert("Marks 0 se 100 ke beech hone chahiye.");
+        return;
+    }
+
+    const assessmentDate = prompt("Enter date (YYYY-MM-DD):");
+    if (assessmentDate === null || !assessmentDate.trim()) return;
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(assessmentDate)) {
+        alert("Date YYYY-MM-DD format mein enter karo.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`/students/${id}/assessments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                assessment_name: assessmentName.trim(),
+                marks: marks,
+                assessment_date: assessmentDate
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            alert(result.error || "Assessment save nahi hua.");
+            return;
+        }
+
+        alert("Assessment successfully save ho gaya!");
+        await viewAssessments(id);
+
+    } catch (error) {
+        alert("Server se connection nahi ho paaya.");
+        console.error(error);
+    }
+}
+
+async function viewAssessments(id) {
+    try {
+        const response = await fetch(`/students/${id}/assessments`);
+        const result = await response.json();
+
+        if (!response.ok) {
+            alert(result.error || "History load nahi hui.");
+            return;
+        }
+
+        if (result.length === 0) {
+            alert("Is student ki abhi koi assessment history nahi hai.");
+            return;
+        }
+
+        const history = result.map(item =>
+            `${item.assessment_name} | Marks: ${item.marks} | Date: ${
+                String(item.assessment_date).slice(0, 10)
+            }`
+        ).join("\n");
+
+        alert("Assessment History:\n\n" + history);
+
+    } catch (error) {
+        alert("Server se connection nahi ho paaya.");
+        console.error(error);
+    }
+}
+
+async function viewReportCard(id) {
+    try {
+        const response = await fetch(`/students/${id}/report`);
+        const result = await response.json();
+
+        if (!response.ok) {
+            alert(result.error || "Report card load nahi hua.");
+            return;
+        }
+
+        const student = result.student;
+
+        const assessmentDetails = result.assessments.length
+            ? result.assessments.map(item =>
+                `${item.assessment_name}: ${item.marks} marks (${String(item.assessment_date).slice(0, 10)})`
+              ).join("\n")
+            : "No assessments recorded.";
+
+        alert(
+            `STUDENT REPORT CARD\n\n` +
+            `Name: ${student.full_name}\n` +
+            `Roll Number: ${student.roll_number}\n` +
+            `Course: ${student.course}\n` +
+            `Overall Marks: ${student.marks}\n` +
+            `Attendance: ${student.attendance}%\n\n` +
+            `Assessment Count: ${result.assessment_count}\n` +
+            `Assessment Average: ${result.assessment_average}\n\n` +
+            `ASSESSMENTS:\n${assessmentDetails}`
+        );
+
+    } catch (error) {
+        alert("Server se connection nahi ho paaya.");
+        console.error(error);
+    }
+}
+
+async function markStudentAttendance(id) {
+    const attendanceDate = prompt(
+        "Enter attendance date (YYYY-MM-DD):",
+        new Date().toISOString().slice(0, 10)
+    );
+
+    if (attendanceDate === null || !attendanceDate.trim()) return;
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(attendanceDate)) {
+        alert("Date YYYY-MM-DD format mein enter karo.");
+        return;
+    }
+
+    const status = prompt("Enter status: Present or Absent");
+
+    if (status === null) return;
+
+    const normalizedStatus =
+        status.trim().toLowerCase() === "present" ? "Present" :
+        status.trim().toLowerCase() === "absent" ? "Absent" : "";
+
+    if (!normalizedStatus) {
+        alert("Sirf Present ya Absent enter karo.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`/students/${id}/attendance`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                attendance_date: attendanceDate,
+                status: normalizedStatus
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            alert(result.error || "Attendance save nahi hui.");
+            return;
+        }
+
+        alert("Attendance successfully marked!");
+    } catch (error) {
+        alert("Server se connection nahi ho paaya.");
+        console.error(error);
+    }
+}
+
+
+
+    
+async function editAcademicRecord(id) {
+    const marksInput = prompt("Enter marks (0-100):");
+    if (marksInput === null || marksInput.trim() === "") return;
+
+    const attendanceInput = prompt("Enter attendance percentage (0-100):");
+    if (attendanceInput === null || attendanceInput.trim() === "") return;
+
+    const marks = Number(marksInput);
+    const attendance = Number(attendanceInput);
+
+    if (
+        !Number.isFinite(marks) ||
+        !Number.isFinite(attendance) ||
+        marks < 0 || marks > 100 ||
+        attendance < 0 || attendance > 100
+    ) {
+        alert("Marks aur attendance 0 se 100 ke beech hone chahiye.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`/students/${id}/academic`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                marks: marks,
+                attendance: attendance
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            alert(result.error || "Record update nahi hua.");
+            return;
+        }
+
+        alert("Marks aur attendance successfully update ho gaye!");
+        await loadStudents();
+
+    } catch (error) {
+        alert("Server se connection nahi ho paaya.");
+        console.error(error);
+    }
+}
+
+
+    
+async function editStudent(id) {
+    
+function toggleStudentActions(id) {
+    const menu = document.getElementById(`actions-${id}`);
+    if (menu){
+        menu.hidden = !menu.hidden;
+    }
+    menu.hidden = !menu.hidden;
+}
+
+
+    const name = prompt("Enter updated full name:");
+    if (name === null || !name.trim()) return;
+
+    const email = prompt("Enter updated email (optional):");
+    if (email === null) return;
+
+    const course = prompt("Enter updated course:");
+    if (course === null || !course.trim()) return;
+
+    try {
+        const response = await fetch(`/students/${id}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                full_name: name.trim(),
+                email: email.trim() || null,
+                course: course.trim()
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            alert(result.error || "Student update nahi hua.");
+            return;
+        }
+
+        alert("Student updated successfully!");
+        await loadStudents();
+    } catch (error) {
+        alert("Server se connection nahi ho paaya.");
+    }
+}
+
+async function deleteStudent(id) {
+    if (!confirm("Kya tum is student ko delete karna chahte ho?")) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/students/${id}`, {
+            method: "DELETE"
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            alert(result.error || "Student delete nahi hua.");
+            return;
+        }
+
+        alert("Student deleted successfully!");
+        await loadStudents();
+    } catch (error) {
+        alert("Server se connection nahi ho paaya.");
+    }
+}
+
+const sidebarLinks = document.querySelectorAll(".sidebar-link");
+
+sidebarLinks.forEach(link => {
+    link.addEventListener("click", function () {
+        sidebarLinks.forEach(item => {
+            item.classList.remove("active");
+        });
+
+        this.classList.add("active");
+    });
+});
+
+function toggleStudentActions(id) {
+    const menu = document.getElementById("actions-" + id);
+
+    if (menu) {
+        menu.hidden = !menu.hidden;
+    } else {
+        console.error("Actions menu nahi mila:", id);
+    }
+}
+
+async function loadAnalytics() {
+    try {
+        const response = await fetch("/analytics");
+
+        if (!response.ok) {
+            throw new Error("Analytics load nahi hua");
+        }
+
+        const data = await response.json();
+
+        document.getElementById("totalStudents").textContent =
+            data.total_students;
+
+        document.getElementById("averageMarks").textContent =
+            data.average_marks + "%";
+
+        document.getElementById("averageAttendance").textContent =
+            data.average_attendance + "%";
+
+        document.getElementById("lowAttendance").textContent =
+            data.low_attendance_students;
+
+    } catch (error) {
+        console.error("Analytics error:", error);
+    }
+}
+
+loadAnalytics();
+
+async function loadAIStudents() {
+    const select = document.getElementById("aiStudentSelect");
+
+    try {
+        const response = await fetch("/students");
+        const students = await response.json();
+
+        select.innerHTML = '<option value="">Choose a student</option>';
+
+        students.forEach(student => {
+            const option = document.createElement("option");
+            option.value = student.id;
+            option.textContent =
+                `${student.roll_number} - ${student.full_name}`;
+
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Unable to load students:", error);
+    }
+}
+
+
+
+document.addEventListener("DOMContentLoaded", loadAIStudents);
+
+
+async function runAIPrediction() {
+    const studentId = document.getElementById("aiStudentSelect").value;
+    const resultDiv = document.getElementById("aiPredictionResult");
+
+    if (!studentId) {
+        resultDiv.innerHTML = "<p>Please select a student first.</p>";
+        return;
+    }
+
+    resultDiv.innerHTML = "<p>Analyzing student performance...</p>";
+
+    try {
+        const response = await fetch(
+            `/students/${studentId}/ai-prediction`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Prediction failed");
+        }
+
+        const riskColor = {
+            "Low Risk": "#16a34a",
+            "Medium Risk": "#d97706",
+            "High Risk": "#dc2626"
+        };
+
+resultDiv.innerHTML = `
+    <div class="ai-result-grid">
+        <div class="ai-result-card">
+            <h4>Student</h4>
+            <h2>${data.student_name}</h2>
+        </div>
+
+        <div class="ai-result-card">
+            <h4>Current Marks</h4>
+            <h2>${data.current_marks ?? "N/A"}/100</h2>
+        </div>
+
+        <div class="ai-result-card">
+            <h4>Predicted Marks</h4>
+            <h2>${data.predicted_marks}/100</h2>
+        </div>
+
+        <div class="ai-result-card">
+            <h4>Attendance</h4>
+            <h2>${data.attendance ?? "N/A"}%</h2>
+        </div>
+
+        <div class="ai-result-card">
+            <h4>Academic Risk</h4>
+            <h2 class="risk-${data.risk_level.toLowerCase().replace(" ", "-")}">
+                ${data.risk_level}
+            </h2>
+        </div>
+    </div>
+`;
+
+    } catch (error) {
+        resultDiv.textContent = error.message;
+    }
+}
+
+
+
+
+</script>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,313 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Management</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+        }
+
+        .muted {
+            color: #64748b;
+        }
+
+        .panel {
+            background: white;
+            padding: 24px;
+            border-radius: 14px;
+            box-shadow: 0 4px 18px #0f172a0a;
+            margin-bottom: 20px;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: end;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        input, select {
+            padding: 11px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        button, .back-link {
+            padding: 11px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        button:hover, .back-link:hover {
+            background: #1d4ed8;
+        }
+
+        .secondary {
+            background: #475569;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 650px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 14px 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #475569;
+            font-size: 13px;
+        }
+
+        .status {
+            min-width: 125px;
+        }
+
+        #message {
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 15px;
+            }
+
+            .panel {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <div class="header">
+        <div>
+            <h1>Attendance Management</h1>
+            <div class="muted">Manage daily student attendance</div>
+        </div>
+
+        <a class="back-link" href="/">Back to Dashboard</a>
+    </div>
+
+    <div class="panel">
+        <div class="toolbar">
+            <div>
+                <label for="attendanceDate">Attendance Date</label>
+                <input type="date" id="attendanceDate">
+            </div>
+
+            <div>
+                <label for="courseFilter">Course Filter</label>
+                <select id="courseFilter">
+                    <option value="">All Courses</option>
+                </select>
+            </div>
+
+            <button onclick="loadAttendance()">Load Students</button>
+            <button class="secondary" onclick="saveAttendance()">Save Attendance</button>
+        </div>
+
+        <div id="message" role="status"></div>
+    </div>
+
+    <div class="panel">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Roll Number</th>
+                        <th>Student Name</th>
+                        <th>Course</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceTable">
+                    <tr>
+                        <td colspan="4">Loading students...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const dateInput = document.getElementById("attendanceDate");
+    const today = new Date();
+    dateInput.value =
+        `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+    let students = [];
+
+    async function loadAttendance() {
+        const table = document.getElementById("attendanceTable");
+        const message = document.getElementById("message");
+
+        try {
+            const response = await fetch("/students");
+            if (!response.ok) throw new Error("Students could not be loaded");
+
+            students = await response.json();
+
+            const courseFilter = document.getElementById("courseFilter");
+            const selectedCourse = courseFilter.value;
+            const courses = [...new Set(students.map(s => s.course).filter(Boolean))];
+
+            courseFilter.innerHTML = '<option value="">All Courses</option>';
+
+            courses.forEach(course => {
+                const option = document.createElement("option");
+                option.value = course;
+                option.textContent = course;
+                courseFilter.appendChild(option);
+            });
+
+            courseFilter.value = selectedCourse;
+
+            renderStudents();
+            message.textContent = "";
+        } catch (error) {
+            table.innerHTML = '<tr><td colspan="4">Unable to load students.</td></tr>';
+            message.textContent = "Flask server check karo.";
+        }
+    }
+
+    function renderStudents() {
+        const course = document.getElementById("courseFilter").value;
+
+        const filtered = students.filter(student =>
+            !course || student.course === course
+        );
+
+        const table = document.getElementById("attendanceTable");
+
+        if (!filtered.length) {
+            table.innerHTML = '<tr><td colspan="4">No students found.</td></tr>';
+            return;
+        }
+
+        table.innerHTML = filtered.map(student => `
+            <tr data-student-id="${student.id}">
+                <td>${student.roll_number}</td>
+                <td>${student.full_name}</td>
+                <td>${student.course}</td>
+                <td>
+                    <select class="status" aria-label="Attendance status">
+                        <option value="Present">Present</option>
+                        <option value="Absent">Absent</option>
+                    </select>
+                </td>
+            </tr>
+        `).join("");
+    }
+
+    async function saveAttendance() {
+        const date = dateInput.value;
+        const message = document.getElementById("message");
+
+        if (!date) {
+            message.textContent = "Please select a date.";
+            return;
+        }
+
+        const rows = [...document.querySelectorAll("#attendanceTable tr[data-student-id]")];
+
+        if (!rows.length) {
+            message.textContent = "No students to save.";
+            return;
+        }
+
+        message.textContent = "Saving attendance...";
+
+        try {
+            for (const row of rows) {
+                const studentId = row.dataset.studentId;
+                const status = row.querySelector("select").value;
+
+                const response = await fetch(`/students/${studentId}/attendance`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        attendance_date: date,
+                        status: status
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || "Attendance save failed");
+                }
+            }
+
+            message.textContent = "Attendance saved successfully!";
+        } catch (error) {
+            message.textContent = "Error: " + error.message;
+        }
+    }
+
+    document.getElementById("courseFilter")
+        .addEventListener("change", renderStudents);
+
+    loadAttendance();
+</script>
+</body>
+</html>

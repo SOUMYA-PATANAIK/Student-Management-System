@@ -1,0 +1,263 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+
+</head>
+<body>
+    <h1>Smart Student Management System</h1>
+    <p>Manage all your students in one place.</p>
+
+    <h2>Add New Student</h2>
+    
+<div class="stats-container">
+    <div class="stat-card">
+        <p>Total Students</p>
+        <h2 id="totalStudents">0</h2>
+    </div>
+
+    <div class="stat-card">
+        <p>Average Marks</p>
+        <h2 id="averageMarks">0</h2>
+    </div>
+
+    <div class="stat-card">
+        <p>Average Attendance</p>
+        <h2 id="averageAttendance">0%</h2>
+    </div>
+</div>
+
+
+
+    <form id="studentForm">
+        <input type="text" id="roll_number" placeholder="Roll Number" required>
+        <input type="text" id="full_name" placeholder="Full Name" required>
+        <input type="email" id="email" placeholder="Email">
+        <input type="text" id="course" placeholder="Course" required>
+        <button type="submit">Add Student</button>
+    </form>
+
+    <h2>Student Records</h2>
+    
+    <button onclick="loadStudents()">Refresh Students</button>
+    
+<div class="filter-container">
+    <input
+        type="text"
+        id="searchStudent"
+        placeholder="Search by name or roll number..."
+    >
+
+    <select id="courseFilter">
+        <option value="">All Courses</option>
+    </select>
+</div>
+
+
+    <table border="1" cellpadding="8">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Roll Number</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Course</th>
+                <th>Marks</th>
+                <th>Attendance</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="studentTable"></tbody>
+    </table>
+
+    
+<script>
+    
+function filterStudents() {
+    const searchValue = document.getElementById("searchStudent").value.toLowerCase();
+    const courseValue = document.getElementById("courseFilter").value;
+
+    const rows = document.querySelectorAll("#studentTable tr");
+
+    rows.forEach(row => {
+        const name = row.cells[2].textContent.toLowerCase();
+        const rollNumber = row.cells[1].textContent.toLowerCase();
+        const course = row.cells[4].textContent;
+
+        const matchesSearch =
+            name.includes(searchValue) ||
+            rollNumber.includes(searchValue);
+
+        const matchesCourse =
+            courseValue === "" || course === courseValue;
+
+        row.style.display =
+            matchesSearch && matchesCourse ? "" : "none";
+    });
+}
+document.getElementById("searchStudent")
+    .addEventListener("input", filterStudents);
+
+document.getElementById("courseFilter")
+    .addEventListener("change", filterStudents);
+
+    async function loadStudents() {
+        try {
+            const response = await fetch("/students");
+            const students = await response.json();
+            
+const courses = [...new Set(students.map(s => s.course).filter(Boolean))];
+
+const courseFilter = document.getElementById("courseFilter");
+const selectedCourse = courseFilter.value;
+
+courseFilter.innerHTML = '<option value="">All Courses</option>';
+
+courses.forEach(course => {
+    const option = document.createElement("option");
+    option.value = course;
+    option.textContent = course;
+    courseFilter.appendChild(option);
+});
+
+courseFilter.value = selectedCourse;
+
+            document.getElementById("totalStudents").textContent = students.length;
+
+document.getElementById("averageMarks").textContent =
+    students.length ? (students.reduce((sum, s) => sum + Number(s.marks || 0), 0) / students.length).toFixed(2) : "0";
+
+document.getElementById("averageAttendance").textContent =
+    students.length ? (students.reduce((sum, s) => sum + Number(s.attendance || 0), 0) / students.length).toFixed(2) + "%" : "0%";
+
+            const table = document.getElementById("studentTable");
+
+            table.innerHTML = students.map(student => `
+                <tr>
+                    <td>${student.id}</td>
+                    <td>${student.roll_number}</td>
+                    <td>${student.full_name}</td>
+                    <td>${student.email || ""}</td>
+                    <td>${student.course}</td>
+                    <td>${student.marks}</td>
+                    <td>${student.attendance}%</td>
+                    <td>
+                        <button onclick="editStudent(${student.id})">Edit</button>
+
+                        <button onclick="deleteStudent(${student.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join("");
+        } catch (error) {
+            alert("Students load nahi ho paaye.");
+            console.error(error);
+        }
+    }
+
+    document.getElementById("studentForm").addEventListener("submit", async function(event) {
+        event.preventDefault();
+
+        const student = {
+            roll_number: document.getElementById("roll_number").value.trim(),
+            full_name: document.getElementById("full_name").value.trim(),
+            email: document.getElementById("email").value.trim() || null,
+            course: document.getElementById("course").value.trim()
+        };
+
+        try {
+            const response = await fetch("/students", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(student)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                alert(result.error || "Student add nahi hua.");
+                return;
+            }
+
+            alert("Student successfully add ho gaya!");
+            document.getElementById("studentForm").reset();
+            await loadStudents();
+
+        } catch (error) {
+            alert("Server se connection nahi ho paaya.");
+            console.error(error);
+        }
+    });
+
+    loadStudents();
+    
+async function editStudent(id) {
+    const name = prompt("Enter updated full name:");
+    if (name === null || !name.trim()) return;
+
+    const email = prompt("Enter updated email (optional):");
+    if (email === null) return;
+
+    const course = prompt("Enter updated course:");
+    if (course === null || !course.trim()) return;
+
+    try {
+        const response = await fetch(`/students/${id}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                full_name: name.trim(),
+                email: email.trim() || null,
+                course: course.trim()
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            alert(result.error || "Student update nahi hua.");
+            return;
+        }
+
+        alert("Student updated successfully!");
+        await loadStudents();
+    } catch (error) {
+        alert("Server se connection nahi ho paaya.");
+    }
+}
+
+async function deleteStudent(id) {
+    if (!confirm("Kya tum is student ko delete karna chahte ho?")) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/students/${id}`, {
+            method: "DELETE"
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            alert(result.error || "Student delete nahi hua.");
+            return;
+        }
+
+        alert("Student deleted successfully!");
+        await loadStudents();
+    } catch (error) {
+        alert("Server se connection nahi ho paaya.");
+    }
+}
+
+</script>
+</body>
+</html>
